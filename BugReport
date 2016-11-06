@@ -1,0 +1,46 @@
+### The following is a bug report that I sent to Apple
+* Dated October 17, 2016
+------------------------
+Summary:
+To whom it may concern,
+
+The current implementation of programatically inserting entries into the macOS / OS X (every version) is lacking a critical feature. 
+This feature is already accessible through the Keychain Access.app, yet for some reason is not available with the plethora of functions that the "security" command line tool offers. 
+This function is the "Ask for Keychain Password" checkbox that is available under Access Control in the Keychain Access.app. 
+By not allowing developers to select this option programatically, it prevents developers from being able to securely store information into the keychain. 
+This is because App developers cannot restrict access of keychain entry to only their application, or to the legitimate keychain owner.
+
+For example, if someone had unwarranted access to my computer, and wanted to make a call to get the value of the "Chrome Safe Storage" keychain entry, all they would have to do is run "security find-generic-password -ga 'Chrome'". 
+The only thing the malicious user would have to do would be to click "allow" on the keychain popup. 
+Yet, if the computer owner had previously opened up Keychain Access, selected Chrome Safe Storage, gone to it's Access Control, and checked "ask for keychain password", then the malicious user would be forced to enter the authorized user's keychain password, and the unauthorized keychain access would be halted. 
+Google Chrome would still have unfettered access to the application (which is what we want), as it is listed as the only authorized application under Access Control.
+
+Furthermore, if we are a remote attacker, and if "ask for keychain password" is not checked, it is very trivial to implement code that essentially forces a user to click "allow", by forcing the prompt on them until they click accept and we retrieve the password. 
+However, if "ask for keychain password" is checked, and the user clicks "deny" once, it becomes significantly trickier to repeatedly force the prompt (see references).
+
+Steps to Reproduce:
+1. Google Chrome is a good example for this, because it is a very common application, and it is easy to see first hand the keychain entry that it creates through macOS system / library calls.
+2. Run 'security find-generic-password -ga Chrome' in the command line / shell, BEFORE checking the "ask for keychain password" box in Keychain Access. See how no keychain password verification is required for this VERY sensitive information (this Safe Storage Key can decrypt all locally stored google chrome passwords).
+3. In keychain access, go to "Chrome Safe Storage" entry, right click, get info, click Access Control, check the "ask for keychain password" box, and save changes. (there is a bug in Keychain App that requires you to do this process twice in order for the changes to actually take effect [but that is a different, unrelated bug])
+4. Open up google chrome, and notice how it does not ask you to confirm your password because it is already in the list of trusted applications from when it created the keychain entry through the 'security add-generic-password -T | -A' process.
+5. Run "security find-generic-password -ga Chrome" again in the command line, and notice how it now requires you to enter your password.
+
+Expected Results:
+You should see how your password will be required after these steps.
+
+Actual Results:
+
+
+Version:
+ALL macOS / OS X
+
+Notes:
+The function to enable "ask for keychain password" already exists within macOS. 
+It should require little resources to implement this. 
+I am asking that you open up this feature to developers to enable programatically (IE adding a parameter to 'security add-generic-password -T | -A'), so that unwarranted access to keychain information is halted.
+
+So whatever call is being made when I click "ask for keychain password", add that call to the security command line tool, and add an argument that allows me to set that checkbox through the security command line tool, and not through the GUI.
+
+As an app developer, I cannot expect my users to go through the entire GUI process of securing the keychain entries that my app uses. 
+The entire point of app development is to prevent users from having to do these tedious tasks. 
+I cannot guarantee the security of the information of my users if Apple does not provide a way to enable this security feature programatically.
