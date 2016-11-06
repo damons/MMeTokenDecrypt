@@ -1,4 +1,5 @@
 # MMeTokenDecrypt
+
 This program decrypts / extracts all authorization tokens on macOS / OS X / OSX. No user authentication is needed, due to the flawed way in which macOS authorizes keychain access.
 
 Authorization tokens are stored in `/Users/*/Library/Application Support/iCloud/Accounts/DSID` where DSID is Apple's backend identifier for each iCloud account in their system. 
@@ -39,3 +40,34 @@ mmeFMFAppToken = AQAAAABXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX~
 
 mmeFMIPToken = AQAAAABXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX~
 ```
+
+## Notes
+
+If you are using a homebrew-installed version of python you may see the following error when running the script:
+
+```
+user@system:~/code/MMeTokenDecrypt $ python MMeDecrypt.py
+Traceback (most recent call last):
+  File "MMeDecrypt.py", line 2, in <module>
+    from Foundation import NSData, NSPropertyListSerialization
+ImportError: No module named Foundation
+```
+
+You can work around this error by manually specifying the full path to the default system version of python that ships with your OS X version:
+```
+user@system:~/code/MMeTokenDecrypt $ /usr/bin/python MMeDecrypt.py
+Decrypting token plist -> [/Users/user/Library/Application Support/iCloud/Accounts/123413453]
+
+Successfully decrypted token plist!
+
+user@email.com [First Last -> 123413453]
+{
+    cloudKitToken = "AQAAAABXXXXXXXXXXXXXXXXXXXXXXXXXXXXX~";
+    mapsToken = "AQAAAAXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX~";
+    mmeAuthToken = "AQAAAABXXXXXXXXXXXXXXXXXXXXXXXXXXXXX=";
+    mmeBTMMInfiniteToken = "AQAAAABXXXXXXXXXXXXXXXXXXXXXXXXXXXXX~";
+    mmeFMFAppToken = "AQAAAABXXXXXXXXXXXXXXXXXXXXXXXXXXXXX~";
+    mmeFMIPToken = "AQAAAABXXXXXXXXXXXXXXXXXXXXXXXXXXXXX~";
+}
+```
+***Verfiied on Mac OS X El Capitan***
