@@ -70,4 +70,4 @@ user@email.com [First Last -> 123413453]
     mmeFMIPToken = "AQAAAABXXXXXXXXXXXXXXXXXXXXXXXXXXXXX~";
 }
 ```
-***Verfiied on Mac OS X El Capitan***
+***Verified on Mac OS X El Capitan***
