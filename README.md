@@ -14,6 +14,18 @@ The only software that performs a similar function is the forensics grade "Elcom
 
 Apple needs to redesign the way that keychain information is requested. Because this program forks a security subprocess, which is an Apple signed binary, the user is not alerted to the potential dangerous nature of the keychain request dialog. Additionally, an attacker can repeatedly present the user with the keychain dialog, until the user accepts the keychain request, because Apple does not put a timeout on the "deny" attempts. This allows for trivial compromization of iCloud authorization tokens, which can be used to access almost every iCloud service, including `iOS backups, iCloud Contacts, iCloud Drive, iCloud Photo Library, Find my Friends, and Find my iPhone` (see my other repositories).
 
+## Timeline and Reporting
+
+* Reached out to Apple on October 17, 2016. I extensively detailed the broken way in which user keychain authentication occurs on all versions of macOS. 
+
+* I have not heard back from Apple as of November 6, 2016. 
+
+* The bug report encompasses broken keychain access as a whole. MMeTokenDecrypt is one implementation of this bug. See my other repository, OSXChromeDecrypt for another implementation of this bug.
+
+* One notable excerpt from the bug report is as follows `Furthermore, if we are a remote attacker, and if "ask for keychain password" is not checked, it is very trivial to implement code that essentially forces a user to click "allow", by forcing the prompt on them until they click accept and we retrieve the password. However, if "ask for keychain password" is checked, and the user clicks "deny" once, it becomes significantly trickier to repeatedly force the prompt (see references).`
+
+* I have uploaded the bug report to this repository, and will update this file with any updates from Apple.
+
 ---
 ## Usage
 
