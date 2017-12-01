@@ -1,5 +1,8 @@
 # MMeTokenDecrypt
 
+**UPDATE**
+
+
 This program decrypts / extracts all authorization tokens on macOS / OS X / OSX. No user authentication is needed, due to the flawed way in which macOS authorizes keychain access.
 
 Authorization tokens are stored in `/Users/*/Library/Application Support/iCloud/Accounts/DSID` where DSID is Apple's backend identifier for each iCloud account in their system. 
