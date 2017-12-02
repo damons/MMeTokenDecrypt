@@ -6,12 +6,37 @@ import sys
 import glob
 import os
 import binascii
+import datetime
+import struct
 import sqlite3
 from Foundation import NSData, NSPropertyListSerialization
 
-def bin2str(decryptedBinary):
+
+def get_gen_time(token_value):
+    # it appears that apple stores the generation time of the token into
+    # the token. this data is stored in 4 bytes, as a big endian integer.
+    # this function extracts the bytes, decodes them, and converts them
+    # to a datetime object, and returns a string representation of that
+    # datetime object
+    try:
+        token_c = token_value.replace("\"", "").replace("~", "=")
+        time_d = base64.b64decode(token_c).encode("hex").split("00000000")[1:]
+        time_h = [x for x in time_d if not x.startswith("0")][0][:8]
+        time_i = struct.unpack(">I", binascii.unhexlify(time_h))[0]
+        gen_time = "{}".format(datetime.datetime.fromtimestamp(time_i))
+        # hate to catch generic exception, but getting generation time
+        # is second to getting tokens, and the above code is not
+        # perfect for splitting out the encoded time in the tokens
+        # error is usually for bad base64 padding though
+    except Exception:
+        gen_time = "Could not find creation time."
+
+    return gen_time
+
+
+def bin2str(token_bplist, account_bplist=None):
     # convert the decrypted binary plist to an NSData object that can be read
-    bin_list = NSData.dataWithBytes_length_(decryptedBinary, len(decryptedBinary))
+    bin_list = NSData.dataWithBytes_length_(token_bplist, len(token_bplist))
 
     # convert the binary NSData object into a dictionary object
     token_plist = NSPropertyListSerialization.propertyListWithData_options_format_error_(bin_list,
@@ -19,43 +44,80 @@ def bin2str(decryptedBinary):
 
     # accounts db cache
     if "$objects" in token_plist:
-        # weird format, so we have to do some hacky parsing
-        token_str = "{}".format(token_plist)
-        pos_start = token_str.find("mmeBTMMInfiniteToken")
-        
-        # get first instance of $classes after mmeAuthToken
-        pos_end = token_str[pos_start:].find("$classes")
+        # bc it is accounts db cache, we should also have been passed
+        # account_bplist.
+        bin_list = NSData.dataWithBytes_length_(account_bplist,
+                                                len(account_bplist))
+        dsid_plist = NSPropertyListSerialization.propertyListWithData_options_format_error_(bin_list,
+                                                                                            0, None, None)[0]
+        for obj in dsid_plist["$objects"]:
+            if "{}".format(obj).startswith("urn:ds:"):
+                dsid = obj.replace("urn:ds:", "")
 
-        x = token_str[pos_start:pos_end + pos_start]
-        l = [y.strip() for y in x.split(",")]
+        token_dict = {"dsid": dsid}
 
-        # should be last in entry
-        l = l[:(l.index("cloudKitToken") + 1) * 2]
-        zipped = zip(l[:len(l) / 2 ], l[len(l) / 2:])
-        
-        for token in zipped:
-            print("{}: {}\n".format(*token))
+        # do some parsing to get the data out bc it is not stored
+        # in a format that is easy to process with stdlibs
+        token_l = [x.strip().replace(",", "") for x in
+                   "{}".format(token_plist["$objects"]).splitlines()]
 
-        exit()
+        pos_start = token_l.index("mmeBTMMInfiniteToken")
+        pos_end = (token_l.index("cloudKitToken") - pos_start + 1) * 2
+
+        token_short = token_l[pos_start:pos_start + pos_end]
+        zipped = zip(token_short[:len(token_short) / 2],
+                     token_short[len(token_short) / 2:])
+
+        for token_type, token_value in zipped:
+            # attempt to get generation time
+            # this parsing is a little hacky, but it seems to be the best way
+            # to handle all different kinds of iCloud tokens (new and old)
+            gen_time = get_gen_time(token_value)
+
+            token_dict[token_type] = (token_value, gen_time)
+
+        return token_dict
+
     else:
-        print("Successfully decrypted token plist!\n")
-        print("{} [{} -> {}]".format(token_plist["appleAccountInfo"]["primaryEmail"],
-                                     token_plist["appleAccountInfo"]["fullName"], 
-                                     token_plist["appleAccountInfo"]["dsPrsID"]))
-        print(token_plist["tokens"])
-        exit()
+        return token_plist
+
 
 def main():
     # try to find information in database first.
-    conn = sqlite3.connect("{}/Library/Accounts/Accounts4.sqlite".format(os.path.expanduser("~")))
-    curr = conn.cursor()
-    data = curr.execute("SELECT * FROM ZACCOUNTPROPERTY WHERE ZKEY='AccountDelegate'")
-    binaryPlist = data.fetchone()[5]
+    root_path = "{}/Library/Accounts".format(os.path.expanduser("~"))
+    accounts_db = "{}/Accounts3.sqlite".format(root_path)
 
-    # we got the plist
-    if "{}".format(binaryPlist).startswith("bplist00"):
-        print("Parsing tokens from cached Accounts4 file.\n")
-        bin2str("{}".format(binaryPlist))
+    if os.path.isfile("{}/Accounts4.sqlite".format(root_path)):
+        accounts_db = "{}/Accounts4.sqlite".format(root_path)
+
+    conn = sqlite3.connect(accounts_db)
+    curr = conn.cursor()
+    data = curr.execute("SELECT * FROM ZACCOUNTPROPERTY WHERE "
+                        "ZKEY='AccountDelegate'")
+
+    # 5th index is the value we are interested in (bplist of tokens)
+    token_bplist = data.fetchone()[5]
+
+    data = curr.execute("SELECT * FROM ZACCOUNTPROPERTY WHERE "
+                        "ZKEY='account-info'")
+
+    # 5th index will be a bplist with dsid
+    dsid_bplist = data.fetchone()[5]
+
+    # we got the bplists
+    if "{}".format(token_bplist).startswith("bplist00"):
+        print("{}Parsing tokens from cached accounts database at [{}]{}"
+              "".format(bold, accounts_db.split("/")[-1], end))
+        token_dict = bin2str("{}".format(token_bplist),
+                             "{}".format(dsid_bplist))
+
+        print("{}DSID: {}{}\n".format(bold, token_dict["dsid"], end))
+        del token_dict["dsid"]
+
+        for t_type, t_val in token_dict.items():
+            print("{}{}{}: {}".format(violet, t_type, end, t_val[0]))
+            print("{}Creation time: {}{}\n".format(green, t_val[1], end))
+        exit()
 
     # otherwise try by using keychain
     icloud_key = subprocess.Popen("security find-generic-password -ws "
@@ -83,10 +145,10 @@ def main():
     """
 
     key = "t9s\"lx^awe.580Gj%'ld+0LG<#9xa?>vb)-fkwb92[}"
-    
+
     # create Hmac with this key and icloud_key using md5
     hashed = hmac.new(key, msg, digestmod=hashlib.md5).digest()
-    
+
     # turn into hex for openssl subprocess
     hexed_key = binascii.hexlify(hashed)
     IV = 16 * '0'
@@ -94,7 +156,7 @@ def main():
                            "/*".format(os.path.expanduser("~")))
     for x in token_file:
         try:
-            #we can convert to int, that means we have the dsid file.
+            # we can convert to int, that means we have the dsid file.
             int(x.split("/")[-1])
             token_file = x
         except ValueError:
@@ -104,15 +166,31 @@ def main():
         sys.exit()
     else:
         print("Decrypting token plist -> [{}]\n".format(token_file))
-    
+
     # perform decryption with zero dependencies by using openssl binary
     decrypted = subprocess.check_output("openssl enc -d -aes-128-cbc -iv '{}'"
                                         " -K {} < '{}'".format(IV, hexed_key,
-                                                           token_file),
+                                                               token_file),
                                         shell=True)
-    bin2str(decrypted)
+    token_plist = bin2str(decrypted)
+    print("Successfully decrypted token plist!\n")
+    print("{} [{} -> {}]\n".format(token_plist["appleAccountInfo"]["primary"
+                                                                   "Email"],
+                                   token_plist["appleAccountInfo"]["full"
+                                                                   "Name"],
+                                   token_plist["appleAccountInfo"]["dsPr"
+                                                                   "sID"]))
 
+    for t_type, t_value in token_plist["tokens"].items():
+        print("{}{}{}: {}".format(violet, t_type, end, t_value))
+        print("{}Creation time: {}{}\n".format(green, get_gen_time(t_value),
+                                               end))
+
+
+green = "\033[32m"
+violet = "\033[35m"
+bold = "\033[1m"
+end = "\033[0m"
 
 if __name__ == "__main__":
     main()
-
