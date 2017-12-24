@@ -1,11 +1,27 @@
 # MMeTokenDecrypt
 
-**UPDATE**
+**Update December 24, 2017**
 
+***Token extraction without needing Keychain***
 
-This program decrypts / extracts all authorization tokens on macOS / OS X / OSX. No user authentication is needed, due to the flawed way in which macOS authorizes keychain access.
+Authentication tokens are cached in a database on **macOS < 10.13 (pre High-Sierra)**. Any testers for other macOS versions would be appreciated.
 
-Authorization tokens are stored in `/Users/*/Library/Application Support/iCloud/Accounts/DSID` where DSID is Apple's backend identifier for each iCloud account in their system. 
+This update adds a function to hunt for these cached authentication tokens in ~/Library/Accounts/Accounts3.sqlite and ~/Library/Accounts/Accounts4.sqlite. Authentication tokens seem to be stored in this database under the table ZACCOUNTPROPERTY where ZKEY = AccountDelegate. This field contains a binary plist that can be converted to XML, yielding plaintext authentication tokens.
+
+No decryption is needed to access this information in the Accounts database. 
+
+**Implications** of this:
+
+* No more keychain. 
+* No more keychain means that if a forensics investigator (or attacker) has read access to a filesystem they can extract these authentication tokens, **without** having to know the user's keychain password, (or if the user is logged in, **without** having to prompt the user for keychain access).
+
+Also, added some code to display when these authentication tokens were generated on Apple's servers.
+
+## Purpose
+
+This program decrypts / extracts all authentication tokens on macOS / OS X / OSX. No user authentication is needed, due to the flawed way in which macOS authorizes keychain access.
+
+Authentication tokens are stored in `/Users/*/Library/Application Support/iCloud/Accounts/DSID` where DSID is Apple's backend identifier for each iCloud account in their system. 
 
 This `DSID` file is encrypted with `AES-128 CBC` and an empty `intialization vector` (IV). The decryption key for this file is stored in the User's `keychain`, under the service name entry `iCloud`, with the name being the primary email address associated with an iCloud account.
 

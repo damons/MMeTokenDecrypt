@@ -9,6 +9,7 @@ import binascii
 import datetime
 import struct
 import sqlite3
+import platform
 from Foundation import NSData, NSPropertyListSerialization
 
 
@@ -104,6 +105,10 @@ def main():
     # 5th index will be a bplist with dsid
     dsid_bplist = data.fetchone()[5]
 
+    if not int(platform.mac_ver()[0].split(".")[1]) >= 13:
+        print("Tokens are not cached on >= 10.13")
+        token_bplist = ""
+
     # we got the bplists
     if "{}".format(token_bplist).startswith("bplist00"):
         print("{}Parsing tokens from cached accounts database at [{}]{}"
@@ -117,8 +122,9 @@ def main():
         for t_type, t_val in token_dict.items():
             print("{}{}{}: {}".format(violet, t_type, end, t_val[0]))
             print("{}Creation time: {}{}\n".format(green, t_val[1], end))
-        exit()
+        return
 
+    print("Checking keychain.")
     # otherwise try by using keychain
     icloud_key = subprocess.Popen("security find-generic-password -ws "
                                   "'iCloud'", stdout=subprocess.PIPE,
