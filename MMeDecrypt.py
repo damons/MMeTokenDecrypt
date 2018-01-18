@@ -101,13 +101,14 @@ def main():
 
     data = curr.execute("SELECT * FROM ZACCOUNTPROPERTY WHERE "
                         "ZKEY='account-info'")
-
-    # 5th index will be a bplist with dsid
-    dsid_bplist = data.fetchone()[5]
-
+    
     if int(platform.mac_ver()[0].split(".")[1]) >= 13:
         print("Tokens are not cached on >= 10.13")
         token_bplist = ""
+    else:
+        # 5th index will be a bplist with dsid
+        dsid_bplist = data.fetchone()[5]
+
 
     # we got the bplists
     if "{}".format(token_bplist).startswith("bplist00"):
